@@ -78,22 +78,25 @@ void exclusive_scan(int* input, int N, int* result)
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
 
-    cudaMemcpy(result, input, N * sizeof(int), cudaMemcpyDeviceToDevice);
+    int n = nextPow2(N);
+    // cudaMemcpy(result, input, N * sizeof(int), cudaMemcpyDeviceToDevice);
 
     // upsweep phase
-    for (int i = 1; i < N/2; i *= 2) {
-        int blocks = (N / (i*2) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        exclusive_scan_upsweep<<<blocks, THREADS_PER_BLOCK>>>(i, N, result);
+    for (int i = 1; i < n/2; i *= 2) {
+        int threadsPerBlock = min(n / (2*i), THREADS_PER_BLOCK);
+        int blocks = (n / (2*i) + threadsPerBlock - 1) / threadsPerBlock;
+        exclusive_scan_upsweep<<<blocks, threadsPerBlock>>>(i, n, result);
     }
 
-    // input[N-1] = 0;
+    // input[n-1] = 0;
     int zero = 0;
-    cudaMemcpy(result + (N-1), &zero, sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(result + (n-1), &zero, sizeof(int), cudaMemcpyHostToDevice);
 
     // downsweep phase
-    for (int i = N/2; i >= 1; i /= 2) {
-        int blocks = (N / (i*2) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        exclusive_scan_downsweep<<<blocks, THREADS_PER_BLOCK>>>(i, N, result);
+    for (int i = n/2; i >= 1; i /= 2) {
+        int threadsPerBlock = min(n / (2*i), THREADS_PER_BLOCK);
+        int blocks = (n / (2*i) + threadsPerBlock - 1) / threadsPerBlock;
+        exclusive_scan_downsweep<<<blocks, threadsPerBlock>>>(i, n, result);
     }
 }
 
