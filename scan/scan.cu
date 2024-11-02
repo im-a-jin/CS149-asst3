@@ -53,7 +53,7 @@ exclusive_scan_upsweep(int i, int n, int* input) {
 
 __global__ void
 exclusive_scan_downsweep(int i, int n, int* input) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int index = (blockIdx.x * blockDim.x + threadIdx.x) * i;
 
     if (index + i < n) {
         int temp = input[index];
