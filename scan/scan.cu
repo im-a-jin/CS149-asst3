@@ -42,6 +42,26 @@ static inline int nextPow2(int n) {
 // Also, as per the comments in cudaScan(), you can implement an
 // "in-place" scan, since the timing harness makes a copy of input and
 // places it in result
+__global__ void
+exclusive_scan_upsweep(int i, int n, int* input, int* result) {
+    int index = (blockIdx.x * blockDim.x + threadIdx.x) * i;
+
+    if (index + i < n) {
+        input[index + i] += input[index];
+    }
+}
+
+__global__ void
+exclusive_scan_downsweep(int i, int n, int* input, int* result) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (index + i < n) {
+        int temp = input[index];
+        input[index] = input[index + i];
+        input[index + i] += temp;
+    }
+}
+
 void exclusive_scan(int* input, int N, int* result)
 {
 
@@ -53,8 +73,30 @@ void exclusive_scan(int* input, int N, int* result)
     // on the CPU.  Your implementation will need to make multiple calls
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
+    int n = nextPow2(N);
+    int size = n * sizeof(int);
 
+    int* device_input = nullptr;
 
+    cudaMalloc(&device_input, size);
+
+    // upsweep phase
+    for (int i = 1; i <= n/4; i *= 2) {
+        int blocks = (n / (i*2) + threadsPerBlock - 1) / threadsPerBlock;
+        cudaMemcpy(device_input, input, size, cudaMemcpyHostToDevice);
+        exclusive_scan_upsweep<<<blocks, THREADS_PER_BLOCK>>>(i, n, device_input);
+        cudaMemcpy(input, device_input, size, cudaMemcpyDeviceToHost);
+    }
+
+    input[n-1] = 0;
+
+    // downsweep phase
+    for (int i = n/2; i >= 1; i /= 2) {
+        int blocks = (n / (i*2) + threadsPerBlock - 1) / threadsPerBlock;
+        cudaMemcpy(device_input, input, size, cudaMemcpyHostToDevice);
+        exclusive_scan_downsweep<<<blocks, THREADS_PER_BLOCK>>>(i, n, device_input);
+        cudaMemcpy(input, device_input, size, cudaMemcpyDeviceToHost);
+    }
 }
 
 
