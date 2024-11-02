@@ -43,7 +43,7 @@ static inline int nextPow2(int n) {
 // "in-place" scan, since the timing harness makes a copy of input and
 // places it in result
 __global__ void
-exclusive_scan_upsweep(int i, int n, int* input, int* result) {
+exclusive_scan_upsweep(int i, int n, int* input) {
     int index = (blockIdx.x * blockDim.x + threadIdx.x) * i;
 
     if (index + i < n) {
@@ -52,7 +52,7 @@ exclusive_scan_upsweep(int i, int n, int* input, int* result) {
 }
 
 __global__ void
-exclusive_scan_downsweep(int i, int n, int* input, int* result) {
+exclusive_scan_downsweep(int i, int n, int* input) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (index + i < n) {
@@ -82,7 +82,7 @@ void exclusive_scan(int* input, int N, int* result)
 
     // upsweep phase
     for (int i = 1; i <= n/4; i *= 2) {
-        int blocks = (n / (i*2) + threadsPerBlock - 1) / threadsPerBlock;
+        int blocks = (n / (i*2) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         cudaMemcpy(device_input, input, size, cudaMemcpyHostToDevice);
         exclusive_scan_upsweep<<<blocks, THREADS_PER_BLOCK>>>(i, n, device_input);
         cudaMemcpy(input, device_input, size, cudaMemcpyDeviceToHost);
@@ -92,7 +92,7 @@ void exclusive_scan(int* input, int N, int* result)
 
     // downsweep phase
     for (int i = n/2; i >= 1; i /= 2) {
-        int blocks = (n / (i*2) + threadsPerBlock - 1) / threadsPerBlock;
+        int blocks = (n / (i*2) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         cudaMemcpy(device_input, input, size, cudaMemcpyHostToDevice);
         exclusive_scan_downsweep<<<blocks, THREADS_PER_BLOCK>>>(i, n, device_input);
         cudaMemcpy(input, device_input, size, cudaMemcpyDeviceToHost);
