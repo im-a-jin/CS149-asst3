@@ -99,7 +99,6 @@ void saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultar
     cudaMemcpy(resultarray, device_result, size, cudaMemcpyDeviceToHost);
 
     // end timing after result has been copied back into host memory
-    cudaDeviceSynchronize();
     double endTime = CycleTimer::currentSeconds();
 
     cudaError_t errCode = cudaPeekAtLastError();
