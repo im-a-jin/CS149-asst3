@@ -44,7 +44,7 @@ static inline int nextPow2(int n) {
 // places it in result
 __global__ void
 exclusive_scan_upsweep(int i, int n, int* input) {
-    int index = (blockIdx.x * blockDim.x + threadIdx.x) * i;
+    int index = i + (blockIdx.x * blockDim.x + threadIdx.x) * (2 * i) - 1;
 
     if (index + i < n) {
         input[index + i] += input[index];
@@ -53,7 +53,7 @@ exclusive_scan_upsweep(int i, int n, int* input) {
 
 __global__ void
 exclusive_scan_downsweep(int i, int n, int* input) {
-    int index = (blockIdx.x * blockDim.x + threadIdx.x) * i;
+    int index = i + (blockIdx.x * blockDim.x + threadIdx.x) * (2 * i) - 1;
 
     if (index + i < n) {
         int temp = input[index];
@@ -74,28 +74,29 @@ void exclusive_scan(int* input, int N, int* result)
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
     int n = nextPow2(N);
-    int size = n * sizeof(int);
+    int size = N * sizeof(int);
 
-    int* device_input = nullptr;
+    int* padded_input = nullptr;
 
-    cudaMalloc(&device_input, size);
+    cudaMalloc(&padded_input, n * sizeof(int));
 
     // upsweep phase
-    for (int i = 1; i <= n/4; i *= 2) {
+    for (int i = 1; i < n/2; i *= 2) {
         int blocks = (n / (i*2) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        cudaMemcpy(device_input, input, size, cudaMemcpyHostToDevice);
-        exclusive_scan_upsweep<<<blocks, THREADS_PER_BLOCK>>>(i, n, device_input);
-        cudaMemcpy(input, device_input, size, cudaMemcpyDeviceToHost);
+        printf("%d\n", i);
+        cudaMemcpy(padded_input, input, size, cudaMemcpyDeviceToDevice);
+        exclusive_scan_upsweep<<<blocks, THREADS_PER_BLOCK>>>(i, n, padded_input);
+        cudaMemcpy(input, padded_input, size, cudaMemcpyDeviceToDevice);
     }
 
-    input[n-1] = 0;
+    input[N-1] = 0;
 
     // downsweep phase
     for (int i = n/2; i >= 1; i /= 2) {
         int blocks = (n / (i*2) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        cudaMemcpy(device_input, input, size, cudaMemcpyHostToDevice);
-        exclusive_scan_downsweep<<<blocks, THREADS_PER_BLOCK>>>(i, n, device_input);
-        cudaMemcpy(input, device_input, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(padded_input, input, size, cudaMemcpyDeviceToDevice);
+        exclusive_scan_downsweep<<<blocks, THREADS_PER_BLOCK>>>(i, n, padded_input);
+        cudaMemcpy(input, padded_input, size, cudaMemcpyDeviceToDevice);
     }
 }
 
