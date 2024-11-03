@@ -190,6 +190,15 @@ double cudaScanThrust(int* inarray, int* end, int* resultarray) {
 // indices `i` for which `device_input[i] == device_input[i+1]`.
 //
 // Returns the total number of pairs found
+__global__ void
+compare_next(int* input, int N, int* output) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (index + 1 < N) {
+        output[index] = input[index] == input[index+1];
+    }
+}
+
 int find_repeats(int* device_input, int length, int* device_output) {
 
     // CS149 TODO:
@@ -203,6 +212,17 @@ int find_repeats(int* device_input, int length, int* device_output) {
     // exclusive_scan function with them. However, your implementation
     // must ensure that the results of find_repeats are correct given
     // the actual array length.
+
+    int n = nextPow2(length);
+
+    cudaMemset(device_output, 0, n * sizeof(int));
+
+    int threadsPerBlock = min(length, THREADS_PER_BLOCK);
+    int blocks = (length + threadsPerBlock - 1) / threadsPerBlock;
+
+    compare_next<<<blocks, threadsPerBlock>>>(device_input, length, device_output);
+
+    exclusive_scan(device_input, length, device_output);
 
     return 0; 
 }
