@@ -59,7 +59,7 @@ exclusive_scan_downsweep(int i, int N, int* input) {
 }
 
 __global__ void
-print_array(int N, int *input) {
+print_array(int* input, int N) {
     for (int i = 0; i < N; i++) {
         printf("%d\t", input[i]);
     }
@@ -194,9 +194,17 @@ __global__ void
 compare_next(int* input, int N, int* output) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (index + 1 < N) {
-        output[index] = input[index] == input[index+1];
-    }
+    if (index + 1 < N && input[index] == input[index+1])
+        output[index] = 1;
+}
+
+__global__ void
+reduce_index(int* input, int N, int* output) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+    int i = input[index];
+    if (index + 1 < N && input[index] != input[index+1])
+        output[i] = index;
 }
 
 int find_repeats(int* device_input, int length, int* device_output) {
@@ -215,16 +223,26 @@ int find_repeats(int* device_input, int length, int* device_output) {
 
     int n = nextPow2(length);
 
+    int *device_temp = nullptr;
+
+    cudaMalloc(&device_temp, n * sizeof(int));
     cudaMemset(device_output, 0, n * sizeof(int));
 
     int threadsPerBlock = min(length, THREADS_PER_BLOCK);
     int blocks = (length + threadsPerBlock - 1) / threadsPerBlock;
 
-    compare_next<<<blocks, threadsPerBlock>>>(device_input, length, device_output);
+    compare_next<<<blocks, threadsPerBlock>>>(device_input, length, device_temp);
 
-    exclusive_scan(device_input, length, device_output);
+    exclusive_scan(device_temp, length, device_temp);
 
-    return 0; 
+    int output_length = 0;
+    reduce_index<<<blocks, threadsPerBlock>>>(device_temp, length, device_output);
+
+    cudaMemcpy(&output_length, device_temp + length - 1, sizeof(int), cudaMemcpyDeviceToHost);
+
+    cudaFree(device_temp);
+
+    return output_length;
 }
 
 
