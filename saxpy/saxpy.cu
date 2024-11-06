@@ -91,7 +91,12 @@ void saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultar
    
     // run CUDA kernel. (notice the <<< >>> brackets indicating a CUDA
     // kernel launch) Execution on the GPU occurs here.
+    double startTimeInner = CycleTimer::currentSeconds();
     saxpy_kernel<<<blocks, threadsPerBlock>>>(N, alpha, device_x, device_y, device_result);
+    cudaDeviceSynchronize();
+    double endTimeInner = CycleTimer::currentSeconds();
+    double innerDuration = endTimeInner - startTimeInner;
+    printf("saxpy_kernel runtime: %.3f ms\t\t[%.3f GB/s]\n", 1000.f * innerDuration, GBPerSec(totalBytes, innerDuration));
 
     //
     // CS149 TODO: copy result from GPU back to CPU using cudaMemcpy
