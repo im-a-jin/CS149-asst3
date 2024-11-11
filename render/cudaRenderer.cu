@@ -385,7 +385,7 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 // ensure order of update or mutual exclusion on the output image, the
 // resulting image will be incorrect.
 
-__device__ __constant__ circle_index;
+__device__ int circle_index;
 
 __global__ void kernelRenderCircles() {
 
