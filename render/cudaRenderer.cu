@@ -191,7 +191,7 @@ __global__ void kernelAdvanceHypnosis() {
 
 // kernelAdvanceBouncingBalls
 // 
-// Update the positino of the balls
+// Update the position of the balls
 __global__ void kernelAdvanceBouncingBalls() { 
     const float dt = 1.f / 60.f;
     const float kGravity = -2.8f; // sorry Newton
@@ -384,12 +384,20 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 // Each thread renders a circle.  Since there is no protection to
 // ensure order of update or mutual exclusion on the output image, the
 // resulting image will be incorrect.
+
+__device__ __constant__ circle_index;
+
 __global__ void kernelRenderCircles() {
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (index >= cuConstRendererParams.numCircles)
         return;
+
+    if (index == 0)
+        circle_index = 0;
+
+    while (circle_index != index);
 
     int index3 = 3 * index;
 
@@ -425,6 +433,8 @@ __global__ void kernelRenderCircles() {
             imgPtr++;
         }
     }
+
+    circle_index++;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
