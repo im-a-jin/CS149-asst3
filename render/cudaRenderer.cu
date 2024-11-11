@@ -384,20 +384,12 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 // Each thread renders a circle.  Since there is no protection to
 // ensure order of update or mutual exclusion on the output image, the
 // resulting image will be incorrect.
-
-__device__ int circle_index;
-
 __global__ void kernelRenderCircles() {
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (index >= cuConstRendererParams.numCircles)
         return;
-
-    if (index == 0)
-        circle_index = 0;
-
-    while (circle_index != index);
 
     int index3 = 3 * index;
 
@@ -433,8 +425,6 @@ __global__ void kernelRenderCircles() {
             imgPtr++;
         }
     }
-
-    circle_index++;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
