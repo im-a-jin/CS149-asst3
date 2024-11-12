@@ -51,8 +51,8 @@ __constant__ float  cuConstNoise1DValueTable[256];
 __constant__ float  cuConstColorRamp[COLOR_MAP_SIZE][3];
 
 // block dimensions
-#define BLOCK_DIM_X 16
-#define BLOCK_DIM_Y 16
+#define BLOCK_DIM_X 32
+#define BLOCK_DIM_Y 32
 #define SCAN_BLOCK_DIM (BLOCK_DIM_X*BLOCK_DIM_Y)
 #define BUFFER_SIZE 32
 
@@ -398,7 +398,7 @@ __global__ void kernelRenderCircles() {
     __shared__ uint prefixSumInput[SCAN_BLOCK_DIM];
     __shared__ uint prefixSumOutput[SCAN_BLOCK_DIM];
     __shared__ uint prefixSumScratch[2*SCAN_BLOCK_DIM];
-    __shared__ uint circleIndexBlock[SCAN_BLOCK_DIM*BUFFER_SIZE];
+    __shared__ uint circleIndexBlock[BLOCK_DIM_X*BUFFER_SIZE];
 
     short imageWidth = cuConstRendererParams.imageWidth;
     short imageHeight = cuConstRendererParams.imageHeight;
