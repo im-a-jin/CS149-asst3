@@ -419,7 +419,11 @@ __global__ void kernelRenderCircles() {
     for (uint i = circleStartIndex; i < circleEndIndex; i++) {
         float3 p = *(float3*)(&cuConstRendererParams.position[3*i]);
         float  rad = cuConstRendererParams.radius[i];
-        if (circleInBoxConservative(p.x, p.y, rad, blockMinX*invWidth, blockMaxX*invWidth, blockMinY*invHeight, blockMaxY*invHeight))
+        if (circleInBoxConservative(p.x, p.y, rad, 
+                                    blockMinX * invWidth, 
+                                    blockMaxX * invWidth, 
+                                    blockMaxY * invHeight, 
+                                    blockMinY * invHeight))
             circleIndexThread[ci++] = i;
     }
     prefixSumInput[linearThreadIndex] = ci;
@@ -447,6 +451,15 @@ __global__ void kernelRenderCircles() {
         float3 p = *(float3*)(&cuConstRendererParams.position[3*index]);
         shadePixel(index, pixelCenterNorm, p, imgPtr);
     }
+
+//  if (threadIdx.x == 0 || threadIdx.y == 0 || threadIdx.x == BLOCK_DIM_X -
+//      1 || threadIdx.y == BLOCK_DIM_Y - 1) {
+//      if (blockIdx.x == 24 && blockIdx.y == 12) {
+//          *imgPtr = make_float4(1.f, 1.f, 1.f, 1.f);
+//      } else {
+//          *imgPtr = make_float4(0.f, 0.f, 0.f, 0.f);
+//      }
+//  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
