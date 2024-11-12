@@ -54,7 +54,7 @@ __constant__ float  cuConstColorRamp[COLOR_MAP_SIZE][3];
 #define BLOCK_DIM_X 16
 #define BLOCK_DIM_Y 16
 #define SCAN_BLOCK_DIM (BLOCK_DIM_X*BLOCK_DIM_Y)
-#define BUFFER_SIZE 16
+#define BUFFER_SIZE 64
 
 // including parts of the CUDA code from external files to keep this
 // file simpler and to seperate code that should not be modified
@@ -454,11 +454,10 @@ __global__ void kernelRenderCircles() {
 
 //  if (threadIdx.x == 0 || threadIdx.y == 0 || threadIdx.x == BLOCK_DIM_X -
 //      1 || threadIdx.y == BLOCK_DIM_Y - 1) {
+//      float4 color = make_float4(0.f, 0.f, 0.f, 0.f);
 //      if (blockIdx.x == 24 && blockIdx.y == 12) {
-//          *imgPtr = make_float4(1.f, 1.f, 1.f, 1.f);
-//      } else {
-//          *imgPtr = make_float4(0.f, 0.f, 0.f, 0.f);
-//      }
+//          color = make_float4(1.f, 1.f, 1.f, 1.f);
+//      *imgPtr = color;
 //  }
 }
 
