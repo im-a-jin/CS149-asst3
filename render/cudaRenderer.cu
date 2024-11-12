@@ -53,15 +53,15 @@ __constant__ float  cuConstColorRamp[COLOR_MAP_SIZE][3];
 // block dimensions
 #define BLOCK_DIM_X 16
 #define BLOCK_DIM_Y 16
-#define SCAN_BLOCK_DIM BLOCK_DIM_X*BLOCK_DIM_Y
-
+#define SCAN_BLOCK_DIM (BLOCK_DIM_X*BLOCK_DIM_Y)
+#define BUFFER_SIZE 16
 
 // including parts of the CUDA code from external files to keep this
 // file simpler and to seperate code that should not be modified
 #include "noiseCuda.cu_inl"
 #include "lookupColor.cu_inl"
 #include "circleBoxTest.cu_inl"
-#include "exclusive_scan.cu_inl"
+#include "exclusiveScan.cu_inl"
 
 
 // kernelClearImageSnowflake -- (CUDA device code)
@@ -393,32 +393,33 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 // resulting image will be incorrect.
 __global__ void kernelRenderCircles() {
 
-    int linearThreadIndex = threadIdx.y * blockDim.x + threadIdx.x;
+    uint linearThreadIndex = threadIdx.y * blockDim.x + threadIdx.x;
                                                                      
     __shared__ uint prefixSumInput[SCAN_BLOCK_DIM];
     __shared__ uint prefixSumOutput[SCAN_BLOCK_DIM];
     __shared__ uint prefixSumScratch[2*SCAN_BLOCK_DIM];
+    __shared__ uint circleIndexBlock[SCAN_BLOCK_DIM*BUFFER_SIZE];
 
     short imageWidth = cuConstRendererParams.imageWidth;
     short imageHeight = cuConstRendererParams.imageHeight;
     float invWidth = 1.f / imageWidth;
     float invHeight = 1.f / imageHeight;
 
-    short blockMinX = static_cast<short>(blockIdx.x * BLOCK_X);
-    short blockMaxX = static_cast<short>(min(blockMinX + BLOCK_X, imageWidth));
-    short blockMinY = static_cast<short>(blockIdx.y * BLOCK_Y);
-    short blockMaxY = static_cast<short>(min(blockMinY + BLOCK_Y, imageHeight));
+    short blockMinX = static_cast<short>(blockIdx.x * BLOCK_DIM_X);
+    short blockMaxX = static_cast<short>(min(blockMinX + BLOCK_DIM_X, imageWidth));
+    short blockMinY = static_cast<short>(blockIdx.y * BLOCK_DIM_Y);
+    short blockMaxY = static_cast<short>(min(blockMinY + BLOCK_DIM_Y, imageHeight));
 
-    int numCirclesBlock = (cuConstRendererParams.numCircles + SCAN_BLOCK_DIM - 1) / SCAN_BLOCK_DIM;
-    int circleStartIndex = linearThreadIndex * numCirclesBlock;
-    int circleEndIndex = min(linearThreadIndex + numCirclesBlock, cuConstRendererParams.numCircles);
+    uint numCirclesBlock = (cuConstRendererParams.numCircles + SCAN_BLOCK_DIM - 1) / SCAN_BLOCK_DIM;
+    uint circleStartIndex = linearThreadIndex * numCirclesBlock;
+    uint circleEndIndex = min(linearThreadIndex + numCirclesBlock, cuConstRendererParams.numCircles);
 
-    int circleIndexThread[numCirclesBlock];
-    int ci = 0;
-    for (int i = circleStartIndex; i < circleEndIndex; i++) {
+    uint circleIndexThread[BUFFER_SIZE];
+    uint ci = 0;
+    for (uint i = circleStartIndex; i < circleEndIndex; i++) {
         float3 p = *(float3*)(&cuConstRendererParams.position[3*i]);
         float  rad = cuConstRendererParams.radius[i];
-        if (circleInBoxConservative(p.x, p.y, rad, blockMinX*invWidth, blockMaxX*invWidth, blockMinY*invHeight, blockMaxX*invHeight))
+        if (circleInBoxConservative(p.x, p.y, rad, blockMinX*invWidth, blockMaxX*invWidth, blockMinY*invHeight, blockMaxY*invHeight))
             circleIndexThread[ci++] = i;
     }
     prefixSumInput[linearThreadIndex] = ci;
@@ -428,22 +429,21 @@ __global__ void kernelRenderCircles() {
     sharedMemExclusiveScan(linearThreadIndex, prefixSumInput, prefixSumOutput, prefixSumScratch, SCAN_BLOCK_DIM);
     __syncthreads();
 
-    int totalCirclesBlock = prefixSumInput[SCAN_BLOCK_DIM-1] + prefixSumOutput[SCAN_BLOCK_DIM-1];
-    int circleIndexBlock[totalCirclesBlock];
-    int insertionIndex = prefixSumOutput[linearThreadIndex];
-    for (int i = 0; i < ci; i++) {
+    uint insertionIndex = prefixSumOutput[linearThreadIndex];
+    for (uint i = 0; i < ci; i++) {
         circleIndexBlock[insertionIndex + i] = circleIndexThread[i];
     }
     __syncthreads();
 
-    int pixelX = blockIdx.x + threadIdx.x;
-    int pixelY = blockIdx.y + threadIdx.y;
+    uint pixelX = blockMinX + threadIdx.x;
+    uint pixelY = blockMinY + threadIdx.y;
     float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + pixelX)]);
     float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f),
                                          invHeight * (static_cast<float>(pixelY) + 0.5f));
-    // for all pixels in the bonding box
-    for (int i = 0; i < totalCirclesBlock; i++) {
-        int index = circleIndicesBlock[i];
+
+    uint totalCirclesBlock = prefixSumInput[SCAN_BLOCK_DIM-1] + prefixSumOutput[SCAN_BLOCK_DIM-1];
+    for (uint i = 0; i < totalCirclesBlock; i++) {
+        uint index = circleIndexBlock[i];
         float3 p = *(float3*)(&cuConstRendererParams.position[3*index]);
         shadePixel(index, pixelCenterNorm, p, imgPtr);
     }
