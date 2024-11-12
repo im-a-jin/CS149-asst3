@@ -443,10 +443,10 @@ __global__ void kernelRenderCircles() {
         float3 p = *(float3*)(&cuConstRendererParams.position[3*i]);
         float  rad = cuConstRendererParams.radius[i];
         if (circleInBox(p.x, p.y, rad, 
-                                    blockMinX * invWidth, 
-                                    blockMaxX * invWidth, 
-                                    blockMaxY * invHeight, 
-                                    blockMinY * invHeight))
+                        blockMinX * invWidth, 
+                        blockMaxX * invWidth, 
+                        blockMaxY * invHeight, 
+                        blockMinY * invHeight))
             circleIndexThread[ci++] = i;
     }
     prefixSumInput[linearThreadIndex] = ci;
