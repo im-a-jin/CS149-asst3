@@ -412,7 +412,7 @@ __global__ void kernelRenderCircles() {
 
     uint numCirclesBlock = (cuConstRendererParams.numCircles + SCAN_BLOCK_DIM - 1) / SCAN_BLOCK_DIM;
     uint circleStartIndex = linearThreadIndex * numCirclesBlock;
-    uint circleEndIndex = min(linearThreadIndex + numCirclesBlock, cuConstRendererParams.numCircles);
+    uint circleEndIndex = min(circleStartIndex + numCirclesBlock, cuConstRendererParams.numCircles);
 
     uint circleIndexThread[BUFFER_SIZE];
     uint ci = 0;
