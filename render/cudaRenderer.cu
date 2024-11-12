@@ -446,11 +446,13 @@ __global__ void kernelRenderCircles() {
                                          invHeight * (static_cast<float>(pixelY) + 0.5f));
 
     uint totalCirclesBlock = prefixSumInput[SCAN_BLOCK_DIM-1] + prefixSumOutput[SCAN_BLOCK_DIM-1];
+    float4 accum = *imgPtr;
     for (uint i = 0; i < totalCirclesBlock; i++) {
         uint index = circleIndexBlock[i];
         float3 p = *(float3*)(&cuConstRendererParams.position[3*index]);
-        shadePixel(index, pixelCenterNorm, p, imgPtr);
+        shadePixel(index, pixelCenterNorm, p, &accum);
     }
+    *imgPtr = accum;
 
 //  if (threadIdx.x == 0 || threadIdx.y == 0 || threadIdx.x == BLOCK_DIM_X -
 //      1 || threadIdx.y == BLOCK_DIM_Y - 1) {
