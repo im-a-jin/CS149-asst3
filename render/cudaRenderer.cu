@@ -54,7 +54,7 @@ __constant__ float  cuConstColorRamp[COLOR_MAP_SIZE][3];
 #define BLOCK_DIM_X 16
 #define BLOCK_DIM_Y 16
 #define SCAN_BLOCK_DIM (BLOCK_DIM_X*BLOCK_DIM_Y)
-#define BUFFER_SIZE 64
+#define BUFFER_SIZE 32
 
 // including parts of the CUDA code from external files to keep this
 // file simpler and to seperate code that should not be modified
