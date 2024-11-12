@@ -442,7 +442,7 @@ __global__ void kernelRenderCircles() {
     for (uint i = circleStartIndex; i < circleEndIndex; i++) {
         float3 p = *(float3*)(&cuConstRendererParams.position[3*i]);
         float  rad = cuConstRendererParams.radius[i];
-        if (circleInBoxConservative(p.x, p.y, rad, 
+        if (circleInBox(p.x, p.y, rad, 
                                     blockMinX * invWidth, 
                                     blockMaxX * invWidth, 
                                     blockMaxY * invHeight, 
