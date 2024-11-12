@@ -341,15 +341,6 @@ shadePixelSnowflake(int circleIndex, float2 pixelCenter, float3 p, float4* image
     float3 rgb;
     float alpha;
 
-    // there is a non-zero contribution.  Now compute the shading value
-
-    // suggestion: This conditional is in the inner loop.  Although it
-    // will evaluate the same for all threads, there is overhead in
-    // setting up the lane masks etc to implement the conditional.  It
-    // would be wise to perform this logic outside of the loop next in
-    // kernelRenderCircles.  (If feeling good about yourself, you
-    // could use some specialized template magic).
-
     const float kCircleMaxAlpha = .5f;
     const float falloffScale = 4.f;
 
@@ -394,15 +385,6 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 
     float3 rgb;
     float alpha;
-
-    // there is a non-zero contribution.  Now compute the shading value
-
-    // suggestion: This conditional is in the inner loop.  Although it
-    // will evaluate the same for all threads, there is overhead in
-    // setting up the lane masks etc to implement the conditional.  It
-    // would be wise to perform this logic outside of the loop next in
-    // kernelRenderCircles.  (If feeling good about yourself, you
-    // could use some specialized template magic).
 
     // simple: each circle has an assigned color
     int index3 = 3 * circleIndex;
