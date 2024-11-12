@@ -325,6 +325,60 @@ __global__ void kernelAdvanceSnowflake() {
 // pixel from the circle.  Update of the image is done in this
 // function.  Called by kernelRenderCircles()
 __device__ __inline__ void
+shadePixelSnowflake(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
+
+    float diffX = p.x - pixelCenter.x;
+    float diffY = p.y - pixelCenter.y;
+    float pixelDist = diffX * diffX + diffY * diffY;
+
+    float rad = cuConstRendererParams.radius[circleIndex];;
+    float maxDist = rad * rad;
+
+    // circle does not contribute to the image
+    if (pixelDist > maxDist)
+        return;
+
+    float3 rgb;
+    float alpha;
+
+    // there is a non-zero contribution.  Now compute the shading value
+
+    // suggestion: This conditional is in the inner loop.  Although it
+    // will evaluate the same for all threads, there is overhead in
+    // setting up the lane masks etc to implement the conditional.  It
+    // would be wise to perform this logic outside of the loop next in
+    // kernelRenderCircles.  (If feeling good about yourself, you
+    // could use some specialized template magic).
+
+    const float kCircleMaxAlpha = .5f;
+    const float falloffScale = 4.f;
+
+    float normPixelDist = sqrt(pixelDist) / rad;
+    rgb = lookupColor(normPixelDist);
+
+    float maxAlpha = .6f + .4f * (1.f-p.z);
+    maxAlpha = kCircleMaxAlpha * fmaxf(fminf(maxAlpha, 1.f), 0.f); // kCircleMaxAlpha * clamped value
+    alpha = maxAlpha * exp(-1.f * falloffScale * normPixelDist * normPixelDist);
+
+    float oneMinusAlpha = 1.f - alpha;
+
+    // BEGIN SHOULD-BE-ATOMIC REGION
+    // global memory read
+
+    float4 existingColor = *imagePtr;
+    float4 newColor;
+    newColor.x = alpha * rgb.x + oneMinusAlpha * existingColor.x;
+    newColor.y = alpha * rgb.y + oneMinusAlpha * existingColor.y;
+    newColor.z = alpha * rgb.z + oneMinusAlpha * existingColor.z;
+    newColor.w = alpha + existingColor.w;
+
+    // global memory write
+    *imagePtr = newColor;
+
+    // END SHOULD-BE-ATOMIC REGION
+}
+
+__device__ __inline__ void
 shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 
     float diffX = p.x - pixelCenter.x;
@@ -349,24 +403,11 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
     // would be wise to perform this logic outside of the loop next in
     // kernelRenderCircles.  (If feeling good about yourself, you
     // could use some specialized template magic).
-    if (cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME) {
 
-        const float kCircleMaxAlpha = .5f;
-        const float falloffScale = 4.f;
-
-        float normPixelDist = sqrt(pixelDist) / rad;
-        rgb = lookupColor(normPixelDist);
-
-        float maxAlpha = .6f + .4f * (1.f-p.z);
-        maxAlpha = kCircleMaxAlpha * fmaxf(fminf(maxAlpha, 1.f), 0.f); // kCircleMaxAlpha * clamped value
-        alpha = maxAlpha * exp(-1.f * falloffScale * normPixelDist * normPixelDist);
-
-    } else {
-        // simple: each circle has an assigned color
-        int index3 = 3 * circleIndex;
-        rgb = *(float3*)&(cuConstRendererParams.color[index3]);
-        alpha = .5f;
-    }
+    // simple: each circle has an assigned color
+    int index3 = 3 * circleIndex;
+    rgb = *(float3*)&(cuConstRendererParams.color[index3]);
+    alpha = .5f;
 
     float oneMinusAlpha = 1.f - alpha;
 
@@ -447,10 +488,18 @@ __global__ void kernelRenderCircles() {
 
     uint totalCirclesBlock = prefixSumInput[SCAN_BLOCK_DIM-1] + prefixSumOutput[SCAN_BLOCK_DIM-1];
     float4 accum = *imgPtr;
-    for (uint i = 0; i < totalCirclesBlock; i++) {
-        uint index = circleIndexBlock[i];
-        float3 p = *(float3*)(&cuConstRendererParams.position[3*index]);
-        shadePixel(index, pixelCenterNorm, p, &accum);
+    if (cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME) {
+        for (uint i = 0; i < totalCirclesBlock; i++) {
+            uint index = circleIndexBlock[i];
+            float3 p = *(float3*)(&cuConstRendererParams.position[3*index]);
+            shadePixelSnowflake(index, pixelCenterNorm, p, &accum);
+        }
+    } else {
+        for (uint i = 0; i < totalCirclesBlock; i++) {
+            uint index = circleIndexBlock[i];
+            float3 p = *(float3*)(&cuConstRendererParams.position[3*index]);
+            shadePixel(index, pixelCenterNorm, p, &accum);
+        }
     }
     *imgPtr = accum;
 
