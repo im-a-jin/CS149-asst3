@@ -469,6 +469,10 @@ __global__ void kernelRenderCircles() {
                                          invHeight * (static_cast<float>(pixelY) + 0.5f));
 
     uint totalCirclesBlock = prefixSumInput[SCAN_BLOCK_DIM-1] + prefixSumOutput[SCAN_BLOCK_DIM-1];
+
+    if (totalCirclesBlock == 0)
+        return;
+
     float4 accum = *imgPtr;
     if (cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME) {
         for (uint i = 0; i < totalCirclesBlock; i++) {
