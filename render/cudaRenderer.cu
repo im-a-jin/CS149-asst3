@@ -30,6 +30,8 @@ struct GlobalConstants {
 
     int imageWidth;
     int imageHeight;
+    float invWidth;
+    float invHeight;
     float* imageData;
 };
 
@@ -425,8 +427,10 @@ __global__ void kernelRenderCircles() {
 
     short imageWidth = cuConstRendererParams.imageWidth;
     short imageHeight = cuConstRendererParams.imageHeight;
-    float invWidth = 1.f / imageWidth;
-    float invHeight = 1.f / imageHeight;
+//  float invWidth = 1.f / imageWidth;
+//  float invHeight = 1.f / imageHeight;
+    float invWidth = cuConstRendererParams.invWidth;
+    float invHeight = cuConstRendererParams.invHeight;
 
     short blockMinX = static_cast<short>(blockIdx.x * BLOCK_DIM_X);
     short blockMaxX = static_cast<short>(min(blockMinX + BLOCK_DIM_X, imageWidth));
@@ -615,6 +619,8 @@ CudaRenderer::setup() {
     params.numCircles = numCircles;
     params.imageWidth = image->width;
     params.imageHeight = image->height;
+    params.invWidth = 1.f / image->width;
+    params.invHeight = 1.f / image->height;
     params.position = cudaDevicePosition;
     params.velocity = cudaDeviceVelocity;
     params.color = cudaDeviceColor;
