@@ -472,8 +472,12 @@ __global__ void kernelRenderCircles() {
     float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f),
                                          invHeight * (static_cast<float>(pixelY) + 0.5f));
 
-    uint totalCirclesBlock = prefixSumInput[SCAN_BLOCK_DIM-1] + prefixSumOutput[SCAN_BLOCK_DIM-1];
+    if (linearThreadIndex == 0) {
+        prefixSumScratch[0] = prefixSumInput[SCAN_BLOCK_DIM-1] + prefixSumOutput[SCAN_BLOCK_DIM-1];
+    }
+    __syncthreads();
 
+    uint totalCirclesBlock = prefixSumScratch[0];
     if (totalCirclesBlock == 0)
         return;
 
