@@ -696,7 +696,7 @@ CudaRenderer::getImage() {
     // need to copy contents of the rendered image from device memory
     // before we expose the Image object to the caller
 
-    // // // printf("Copying image data from device\n");
+    printf("Copying image data from device\n");
 
     cudaMemcpy(image->data,
                cudaDeviceImageData,
@@ -719,21 +719,21 @@ CudaRenderer::setup() {
     std::string name;
     cudaError_t err = cudaGetDeviceCount(&deviceCount);
 
-    // // // printf("---------------------------------------------------------\n");
-    // // // printf("Initializing CUDA for CudaRenderer\n");
-    // // // printf("Found %d CUDA devices\n", deviceCount);
+    printf("---------------------------------------------------------\n");
+    printf("Initializing CUDA for CudaRenderer\n");
+    printf("Found %d CUDA devices\n", deviceCount);
 
     for (int i=0; i<deviceCount; i++) {
         cudaDeviceProp deviceProps;
         cudaGetDeviceProperties(&deviceProps, i);
         name = deviceProps.name;
 
-        // // // printf("Device %d: %s\n", i, deviceProps.name);
-        // // // printf("   SMs:        %d\n", deviceProps.multiProcessorCount);
-        // // // printf("   Global mem: %.0f MB\n", static_cast<float>(deviceProps.totalGlobalMem) / (1024 * 1024));
-        // // // printf("   CUDA Cap:   %d.%d\n", deviceProps.major, deviceProps.minor);
+        printf("Device %d: %s\n", i, deviceProps.name);
+        printf("   SMs:        %d\n", deviceProps.multiProcessorCount);
+        printf("   Global mem: %.0f MB\n", static_cast<float>(deviceProps.totalGlobalMem) / (1024 * 1024));
+        printf("   CUDA Cap:   %d.%d\n", deviceProps.major, deviceProps.minor);
     }
-    // // // printf("---------------------------------------------------------\n");
+    printf("---------------------------------------------------------\n");
     
     // By this time the scene should be loaded.  Now copy all the key
     // data structures into device memory so they are accessible to
