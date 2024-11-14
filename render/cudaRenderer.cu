@@ -1141,12 +1141,109 @@ struct circle_out_of_bounds {
 
 
 
+// kernelRenderCirclesSmall -- (CUDA device code)
+//
+// Each thread renders a circle.  Since there is no protection to
+// ensure order of update or mutual exclusion on the output image, the
+// resulting image will be incorrect.
+__global__ void kernelRenderCirclesSmall() {
 
+    uint linearThreadIndex = threadIdx.y * blockDim.x + threadIdx.x;
+                                                                     
+    __shared__ uint prefixSumInput[SCAN_BLOCK_DIM];
+    __shared__ uint prefixSumOutput[SCAN_BLOCK_DIM];
+    __shared__ uint prefixSumScratch[2*SCAN_BLOCK_DIM];
+    __shared__ uint circleIndexBlock[BLOCK_DIM_X*BUFFER_SIZE];
+
+    short imageWidth = cuConstRendererParams.imageWidth;
+    short imageHeight = cuConstRendererParams.imageHeight;
+    float invWidth = 1.f / imageWidth;
+    float invHeight = 1.f / imageHeight;
+
+    short blockMinX = static_cast<short>(blockIdx.x * BLOCK_DIM_X);
+    short blockMaxX = static_cast<short>(min(blockMinX + BLOCK_DIM_X, imageWidth));
+    short blockMinY = static_cast<short>(blockIdx.y * BLOCK_DIM_Y);
+    short blockMaxY = static_cast<short>(min(blockMinY + BLOCK_DIM_Y, imageHeight));
+
+    uint numCirclesBlock = (cuConstRendererParams.numCircles + SCAN_BLOCK_DIM - 1) / SCAN_BLOCK_DIM;
+    uint circleStartIndex = linearThreadIndex * numCirclesBlock;
+    uint circleEndIndex = min(circleStartIndex + numCirclesBlock, cuConstRendererParams.numCircles);
+
+    uint circleIndexThread[BUFFER_SIZE];
+    uint ci = 0;
+    for (uint i = circleStartIndex; i < circleEndIndex; i++) {
+        float3 p = *(float3*)(&cuConstRendererParams.position[3*i]);
+        float  rad = cuConstRendererParams.radius[i];
+        if (circleInBoxConservative(p.x, p.y, rad, 
+                                    blockMinX * invWidth, 
+                                    blockMaxX * invWidth, 
+                                    blockMaxY * invHeight, 
+                                    blockMinY * invHeight))
+            circleIndexThread[ci++] = i;
+    }
+    prefixSumInput[linearThreadIndex] = ci;
+    __syncthreads();
+
+    // count number of circles in block
+    sharedMemExclusiveScan(linearThreadIndex, prefixSumInput, prefixSumOutput, prefixSumScratch, SCAN_BLOCK_DIM);
+    __syncthreads();
+
+    uint insertionIndex = prefixSumOutput[linearThreadIndex];
+    for (uint i = 0; i < ci; i++) {
+        circleIndexBlock[insertionIndex + i] = circleIndexThread[i];
+    }
+    __syncthreads();
+
+    uint pixelX = blockMinX + threadIdx.x;
+    uint pixelY = blockMinY + threadIdx.y;
+    float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + pixelX)]);
+    float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f),
+                                         invHeight * (static_cast<float>(pixelY) + 0.5f));
+
+    uint totalCirclesBlock = prefixSumInput[SCAN_BLOCK_DIM-1] + prefixSumOutput[SCAN_BLOCK_DIM-1];
+    float4 accum = *imgPtr;
+    if (cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME) {
+        for (uint i = 0; i < totalCirclesBlock; i++) {
+            uint index = circleIndexBlock[i];
+            float3 p = *(float3*)(&cuConstRendererParams.position[3*index]);
+            shadePixelSnowflake(index, pixelCenterNorm, p, &accum);
+        }
+    } else {
+        for (uint i = 0; i < totalCirclesBlock; i++) {
+            uint index = circleIndexBlock[i];
+            float3 p = *(float3*)(&cuConstRendererParams.position[3*index]);
+            shadePixel(index, pixelCenterNorm, p, &accum);
+        }
+    }
+    *imgPtr = accum;
+
+//  if (threadIdx.x == 0 || threadIdx.y == 0 || threadIdx.x == BLOCK_DIM_X -
+//      1 || threadIdx.y == BLOCK_DIM_Y - 1) {
+//      float4 color = make_float4(0.f, 0.f, 0.f, 0.f);
+//      if (blockIdx.x == 24 && blockIdx.y == 12) {
+//          color = make_float4(1.f, 1.f, 1.f, 1.f);
+//      *imgPtr = color;
+//  }
+}
 
 
 
 void
 CudaRenderer::render() {
+
+    // Default solution for small vectors
+
+    if (numCircles <= 100000) {
+        dim3 blockDim(BLOCK_DIM_X, BLOCK_DIM_Y, 1);
+        dim3 gridDim(
+            (image->width + blockDim.x - 1) / blockDim.x,
+            (image->height + blockDim.y - 1) / blockDim.y);
+
+        kernelRenderCirclesSmall<<<gridDim, blockDim>>>();
+        cudaDeviceSynchronize();
+        return;
+    }
+
 
     // Thrust section
 
