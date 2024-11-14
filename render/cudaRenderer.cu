@@ -1219,8 +1219,6 @@ CudaRenderer::render() {
     // int numCirclesFilt = numCircles;
 
 
-    //int numCirclesFilt = numCircles;
-
     // Check
     // // printf("Filtered out of bounds circles: From %d to %d\n", numCircles, numCirclesFilt);
 
@@ -1478,9 +1476,5 @@ CudaRenderer::render() {
     );
     cudaDeviceSynchronize();
 
-
-
-
-//     // 256 threads per block is a healthy number
 }
 
